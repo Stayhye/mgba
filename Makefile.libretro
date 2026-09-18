@@ -266,7 +266,7 @@ else ifeq ($(platform), ps2)
    CFLAGS += -G0 -DHAVE_NO_LANGEXTRA -DHAVE_STRTOF_L
    STATIC_LINKING = 1
    DEFINES += -std=c99
-	HAVE_VFS_FD = 0
+   HAVE_VFS_FD = 0
 
 # PSP
 else ifeq ($(platform), psp1)
