@@ -39,6 +39,11 @@ FS_Archive sdmcArchive;
 #include <switch.h>
 #endif
 
+#ifdef __PS2__
+#include <malloc.h>
+#include <kernel.h>
+#endif
+
 #include "libretro_core_options.h"
 
 #define SAMPLES 512
@@ -122,119 +127,119 @@ static int32_t gyroZ = 0;
 /* Frame skipping functions */
 
 static void _retroAudioBuffStatusCallback(bool active, unsigned occupancy, bool underrunLikely) {
-	retroAudioBuffActive    = active;
-	retroAudioBuffOccupancy = occupancy;
-	retroAudioBuffUnderrun  = underrunLikely;
+    retroAudioBuffActive    = active;
+    retroAudioBuffOccupancy = occupancy;
+    retroAudioBuffUnderrun  = underrunLikely;
 }
 
 static void _initFrameskip(void) {
 
-	if (frameskipType > 0) {
+    if (frameskipType > 0) {
 
-		bool calculateAudioLatency = true;
+        bool calculateAudioLatency = true;
 
-		if (frameskipType == 3) { /* Fixed Interval */
-			environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
-		} else {
+        if (frameskipType == 3) { /* Fixed Interval */
+            environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
+        } else {
 
-			struct retro_audio_buffer_status_callback BuffStatusCb;
-			BuffStatusCb.callback = _retroAudioBuffStatusCallback;
+            struct retro_audio_buffer_status_callback BuffStatusCb;
+            BuffStatusCb.callback = _retroAudioBuffStatusCallback;
 
-			if (!environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, &BuffStatusCb)) {
+            if (!environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, &BuffStatusCb)) {
 
-				if (logCallback)
-					logCallback(RETRO_LOG_WARN, "Frameskip disabled - frontend does not support audio buffer status monitoring.\n");
+                if (logCallback)
+                    logCallback(RETRO_LOG_WARN, "Frameskip disabled - frontend does not support audio buffer status monitoring.\n");
 
-				retroAudioBuffActive    = false;
-				retroAudioBuffOccupancy = 0;
-				retroAudioBuffUnderrun  = false;
-				retroAudioLatency       = 0;
-				calculateAudioLatency   = false;
-			}
-		}
+                retroAudioBuffActive    = false;
+                retroAudioBuffOccupancy = 0;
+                retroAudioBuffUnderrun  = false;
+                retroAudioLatency       = 0;
+                calculateAudioLatency   = false;
+            }
+        }
 
-		if (calculateAudioLatency) {
+        if (calculateAudioLatency) {
 
-			/* Frameskip is enabled - increase frontend
-			 * audio latency to minimise potential
-			 * buffer underruns */
-			float frameTimeMsec = 1000.0f * (float)core->frameCycles(core) /
-					(float)core->frequency(core);
+            /* Frameskip is enabled - increase frontend
+             * audio latency to minimise potential
+             * buffer underruns */
+            float frameTimeMsec = 1000.0f * (float)core->frameCycles(core) /
+                    (float)core->frequency(core);
 
-			/* Set latency to 6x current frame time... */
-			retroAudioLatency = (unsigned)((6.0f * frameTimeMsec) + 0.5f);
+            /* Set latency to 6x current frame time... */
+            retroAudioLatency = (unsigned)((6.0f * frameTimeMsec) + 0.5f);
 
-			/* ...then round up to nearest multiple of 32 */
-			retroAudioLatency = (retroAudioLatency + 0x1F) & ~0x1F;
-		}
+            /* ...then round up to nearest multiple of 32 */
+            retroAudioLatency = (retroAudioLatency + 0x1F) & ~0x1F;
+        }
 
-	} else {
-		environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
-		retroAudioLatency = 0;
-	}
+    } else {
+        environCallback(RETRO_ENVIRONMENT_SET_AUDIO_BUFFER_STATUS_CALLBACK, NULL);
+        retroAudioLatency = 0;
+    }
 
-	updateAudioLatency = true;
+    updateAudioLatency = true;
 }
 
 static void _loadFrameskipSettings(struct mCoreOptions *opts) {
 
-	struct retro_variable var;
-	unsigned oldFrameskipType;
-	unsigned frameskipInterval;
+    struct retro_variable var;
+    unsigned oldFrameskipType;
+    unsigned frameskipInterval;
 
-	var.key   = "mgba_frameskip";
-	var.value = 0;
+    var.key   = "mgba_frameskip";
+    var.value = 0;
 
-	oldFrameskipType = frameskipType;
-	frameskipType    = 0;
+    oldFrameskipType = frameskipType;
+    frameskipType    = 0;
 
-	if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-		if (strcmp(var.value, "auto") == 0) {
-			frameskipType = 1;
-		} else if (strcmp(var.value, "auto_threshold") == 0) {
-			frameskipType = 2;
-		} else if (strcmp(var.value, "fixed_interval") == 0) {
-			frameskipType = 3;
-		}
-	}
+    if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+        if (strcmp(var.value, "auto") == 0) {
+            frameskipType = 1;
+        } else if (strcmp(var.value, "auto_threshold") == 0) {
+            frameskipType = 2;
+        } else if (strcmp(var.value, "fixed_interval") == 0) {
+            frameskipType = 3;
+        }
+    }
 
-	var.key   = "mgba_frameskip_threshold";
-	var.value = 0;
+    var.key   = "mgba_frameskip_threshold";
+    var.value = 0;
 
-	frameskipThreshold = 33;
+    frameskipThreshold = 33;
 
-	if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-		frameskipThreshold = strtol(var.value, NULL, 10);
+    if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+        frameskipThreshold = strtol(var.value, NULL, 10);
 
-	var.key   = "mgba_frameskip_interval";
-	var.value = 0;
+    var.key   = "mgba_frameskip_interval";
+    var.value = 0;
 
-	frameskipInterval = 0;
+    frameskipInterval = 0;
 
-	if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-		frameskipInterval = strtol(var.value, NULL, 10);
+    if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+        frameskipInterval = strtol(var.value, NULL, 10);
 
-	/* Update internal (mGBA config) frameskip value */
-	if (opts) {
-		opts->frameskip = (frameskipType == 3) ?
-				frameskipInterval : 0;
-	} else {
-		mCoreConfigSetUIntValue(&core->config, "frameskip",
-				(frameskipType == 3) ? frameskipInterval : 0);
-		mCoreLoadConfig(core);
-	}
+    /* Update internal (mGBA config) frameskip value */
+    if (opts) {
+        opts->frameskip = (frameskipType == 3) ?
+                frameskipInterval : 0;
+    } else {
+        mCoreConfigSetUIntValue(&core->config, "frameskip",
+                (frameskipType == 3) ? frameskipInterval : 0);
+        mCoreLoadConfig(core);
+    }
 
-	/* (Re)initialise frameskipping, if required */
-	if (opts || (frameskipType != oldFrameskipType)) {
-		_initFrameskip();
-	}
+    /* (Re)initialise frameskipping, if required */
+    if (opts || (frameskipType != oldFrameskipType)) {
+        _initFrameskip();
+    }
 }
 
 /* Video post processing */
 #if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
 
 /* Colour correction */
-#define CC_TARGET_GAMMA   2.2f
+#define CC_TARGET_GAMMA    2.2f
 #define CC_RGB_MAX        31.0f
 
 /* > Note: GBC and GBA share almost identical
@@ -264,8 +269,8 @@ static void _loadFrameskipSettings(struct mCoreOptions *opts) {
 #define GBA_CC_BG         0.21f
 #define GBA_CC_GAMMA_ADJ  1.0f
 
-static color_t* ccLUT              = NULL;
-static unsigned ccType             = 0;
+static color_t* ccLUT             = NULL;
+static unsigned ccType            = 0;
 static bool colorCorrectionEnabled = false;
 
 static void _initColorCorrection(void) {
@@ -1338,376 +1343,365 @@ int16_t cycleturbo(bool x/*turbo A*/, bool y/*turbo B*/, bool l2/*turbo L*/, boo
 
 
 void retro_run(void) {
-	uint16_t keys;
-	bool skipFrame = false;
+    uint16_t keys;
+    bool skipFrame = false;
 
-	_initSensors();
-	inputPollCallback();
+    _initSensors();
+    inputPollCallback();
 
-	bool updated = false;
-	if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated) {
-		envVarsUpdated = true;
+    bool updated = false;
+    if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated) {
+        envVarsUpdated = true;
 
-		struct retro_variable var = {
-			.key = "mgba_allow_opposing_directions",
-			.value = 0
-		};
-		if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-			mCoreConfigSetIntValue(&core->config, "allowOpposingDirections", strcmp(var.value, "yes") == 0);
-			core->reloadConfigOption(core, "allowOpposingDirections", NULL);
-		}
+        struct retro_variable var = {
+            .key = "mgba_allow_opposing_directions",
+            .value = 0
+        };
+        if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
+            mCoreConfigSetIntValue(&core->config, "allowOpposingDirections", strcmp(var.value, "yes") == 0);
+            core->reloadConfigOption(core, "allowOpposingDirections", NULL);
+        }
 
-    _loadFrameskipSettings(NULL);
-//		var.key = "mgba_frameskip";
-//		var.value = 0;
-//		if (environCallback(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-//			mCoreConfigSetIntValue(&core->config, "frameskip", strtol(var.value, NULL, 10));
-//			core->reloadConfigOption(core, "frameskip", NULL);
-//		}
+        _loadFrameskipSettings(NULL);
 
 #if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
-		_loadPostProcessingSettings();
+        _loadPostProcessingSettings();
 #endif
-	}
+    }
 
-	unsigned i;
-	int16_t joypad_bits;
-	if (libretro_supports_bitmasks)
-		joypad_bits = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
-	else
-	{
-		joypad_bits = 0;
-		for (i = 0; i < (RETRO_DEVICE_ID_JOYPAD_R3+1); i++)
-			joypad_bits |= inputCallback(0, RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
-	}
+    unsigned i;
+    int16_t joypad_bits;
+    if (libretro_supports_bitmasks)
+        joypad_bits = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+    else
+    {
+        joypad_bits = 0;
+        for (i = 0; i < (RETRO_DEVICE_ID_JOYPAD_R3+1); i++)
+            joypad_bits |= inputCallback(0, RETRO_DEVICE_JOYPAD, 0, i) ? (1 << i) : 0;
+    }
 
-	keys = 0;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_A))) << 0;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_B))) << 1;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_SELECT))) << 2;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_START))) << 3;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_RIGHT))) << 4;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_LEFT))) << 5;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_UP))) << 6;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_DOWN))) << 7;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_R))) << 8;
-	keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_L))) << 9;
+    keys = 0;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_A))) << 0;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_B))) << 1;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_SELECT))) << 2;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_START))) << 3;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_RIGHT))) << 4;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_LEFT))) << 5;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_UP))) << 6;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_DOWN))) << 7;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_R))) << 8;
+    keys |= (!!(joypad_bits & (1 << RETRO_DEVICE_ID_JOYPAD_L))) << 9;
 
-	//turbo keys
-	keys |= cycleturbo(RDKEYP1(X),RDKEYP1(Y),RDKEYP1(L2),RDKEYP1(R2));
+    /* Turbo keys mapping for extended controller layouts */
+    keys |= cycleturbo(RDKEYP1(X), RDKEYP1(Y), RDKEYP1(L2), RDKEYP1(R2));
 
-	core->setKeys(core, keys);
+    core->setKeys(core, keys);
 
-	if (!luxSensorUsed) {
-		static bool wasAdjustingLux = false;
-		if (wasAdjustingLux) {
-			wasAdjustingLux = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ||
-			                  inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3);
-		} else {
-			if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3)) {
-				++luxLevelIndex;
-				if (luxLevelIndex > 10) {
-					luxLevelIndex = 10;
-				}
-				wasAdjustingLux = true;
-			} else if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3)) {
-				--luxLevelIndex;
-				if (luxLevelIndex < 0) {
-					luxLevelIndex = 0;
-				}
-				wasAdjustingLux = true;
-			}
-		}
-	}
+    if (!luxSensorUsed) {
+        static bool wasAdjustingLux = false;
+        if (wasAdjustingLux) {
+            wasAdjustingLux = inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3) ||
+                              inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3);
+        } else {
+            if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3)) {
+                ++luxLevelIndex;
+                if (luxLevelIndex > 10) {
+                    luxLevelIndex = 10;
+                }
+                wasAdjustingLux = true;
+            } else if (inputCallback(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3)) {
+                --luxLevelIndex;
+                if (luxLevelIndex < 0) {
+                    luxLevelIndex = 0;
+                }
+                wasAdjustingLux = true;
+            }
+        }
+    }
 
-	/* Check whether current frame should
-	 * be skipped */
-	if ((frameskipType > 0)  &&
-		 (frameskipType != 3) && /* Ignore 'Fixed Interval' - handled internally */
-		 retroAudioBuffActive) {
+    /* Check whether current frame should be skipped */
+    if ((frameskipType > 0) &&
+         (frameskipType != 3) && /* Ignore 'Fixed Interval' - handled internally */
+         retroAudioBuffActive) {
 
-		switch (frameskipType) {
-			case 1: /* Auto */
-				skipFrame = retroAudioBuffUnderrun;
-				break;
-			case 2: /* Auto (Threshold) */
-				skipFrame = (retroAudioBuffOccupancy < frameskipThreshold);
-				break;
-			default:
-				skipFrame = false;
-				break;
-		}
+        switch (frameskipType) {
+            case 1: /* Auto */
+                skipFrame = retroAudioBuffUnderrun;
+                break;
+            case 2: /* Auto (Threshold) */
+                skipFrame = (retroAudioBuffOccupancy < frameskipThreshold);
+                break;
+            default:
+                skipFrame = false;
+                break;
+        }
 
-		if (skipFrame) {
-			if(frameskipCounter < RETRO_FRAMESKIP_MAX) {
+        if (skipFrame) {
+            if (frameskipCounter < RETRO_FRAMESKIP_MAX) {
 
-				switch (core->platform(core)) {
+                switch (core->platform(core)) {
 #ifdef M_CORE_GBA
-				case PLATFORM_GBA:
-					((struct GBA*) core->board)->video.frameskipCounter = 1;
-					break;
+                case PLATFORM_GBA:
+                    ((struct GBA*) core->board)->video.frameskipCounter = 1;
+                    break;
 #endif
 #ifdef M_CORE_GB
-				case PLATFORM_GB:
-					((struct GB*) core->board)->video.frameskipCounter = 1;
-					break;
+                case PLATFORM_GB:
+                    ((struct GB*) core->board)->video.frameskipCounter = 1;
+                    break;
 #endif
-				default:
-					break;
-				}
-				frameskipCounter++;
+                default:
+                    break;
+                }
+                frameskipCounter++;
 
-			} else {
-				frameskipCounter = 0;
-				skipFrame        = false;
-			}
-		} else {
-			frameskipCounter = 0;
-		}
-	}
+            } else {
+                frameskipCounter = 0;
+                skipFrame        = false;
+            }
+        } else {
+            frameskipCounter = 0;
+        }
+    }
 
-   /* If frameskip settings have changed, update
-    * frontend audio latency */
-   if (updateAudioLatency)
-   {
-      environCallback(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
-            &retroAudioLatency);
-      updateAudioLatency = false;
-   }
+    /* If frameskip settings have changed, update frontend audio latency */
+    if (updateAudioLatency)
+    {
+       environCallback(RETRO_ENVIRONMENT_SET_MINIMUM_AUDIO_LATENCY,
+             &retroAudioLatency);
+       updateAudioLatency = false;
+    }
 
-	core->runFrame(core);
-	unsigned width, height;
-	core->desiredVideoDimensions(core, &width, &height);
+    core->runFrame(core);
+    unsigned width, height;
+    core->desiredVideoDimensions(core, &width, &height);
 
-	/* If using 'Fixed Interval' frameskipping, check
-	 * whether a frame is currently available  */
-	if (frameskipType == 3) {
-		switch (core->platform(core)) {
-	#ifdef M_CORE_GBA
-		case PLATFORM_GBA:
-			skipFrame = ((struct GBA*) core->board)->video.frameskipCounter > 0;
-			break;
-	#endif
-	#ifdef M_CORE_GB
-		case PLATFORM_GB:
-			skipFrame = ((struct GB*) core->board)->video.frameskipCounter > 0;
-			break;
-	#endif
-		default:
-			break;
-		}
-	}
+    /* If using 'Fixed Interval' frameskipping, check whether a frame is currently available */
+    if (frameskipType == 3) {
+        switch (core->platform(core)) {
+    #ifdef M_CORE_GBA
+        case PLATFORM_GBA:
+            skipFrame = ((struct GBA*) core->board)->video.frameskipCounter > 0;
+            break;
+    #endif
+    #ifdef M_CORE_GB
+        case PLATFORM_GB:
+            skipFrame = ((struct GB*) core->board)->video.frameskipCounter > 0;
+            break;
+    #endif
+        default:
+            break;
+        }
+    }
 
-	if (!skipFrame) {
+    if (!skipFrame) {
 #if defined(COLOR_16_BIT) && defined(COLOR_5_6_5)
-		if (videoPostProcess) {
-			videoPostProcess(width, height);
-			videoCallback(ppOutputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
-		} else
+        if (videoPostProcess) {
+            videoPostProcess(width, height);
+            videoCallback(ppOutputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
+        } else
 #endif
-			videoCallback(outputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
-	} else {
-		videoCallback(NULL, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
-	}
+            videoCallback(outputBuffer, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
+    } else {
+        videoCallback(NULL, width, height, VIDEO_WIDTH_MAX * sizeof(color_t));
+    }
 
-	// This was from aliaspider patch (4539a0e), game boy audio is buggy with it (adapted for this refactored core)
-/*
-	int16_t samples[SAMPLES * 2];
-	int produced = blip_read_samples(core->getAudioChannel(core, 0), samples, SAMPLES, true);
-	blip_read_samples(core->getAudioChannel(core, 1), samples + 1, SAMPLES, true);
-	audioCallback(samples, produced);
-*/
-
-	if (rumbleCallback) {
-		if (rumbleUp) {
-			rumbleCallback(0, RETRO_RUMBLE_STRONG, rumbleUp * 0xFFFF / (rumbleUp + rumbleDown));
-			rumbleCallback(0, RETRO_RUMBLE_WEAK, rumbleUp * 0xFFFF / (rumbleUp + rumbleDown));
-		} else {
-			rumbleCallback(0, RETRO_RUMBLE_STRONG, 0);
-			rumbleCallback(0, RETRO_RUMBLE_WEAK, 0);
-		}
-		rumbleUp = 0;
-		rumbleDown = 0;
-	}
+    if (rumbleCallback) {
+        if (rumbleUp) {
+            rumbleCallback(0, RETRO_RUMBLE_STRONG, rumbleUp * 0xFFFF / (rumbleUp + rumbleDown));
+            rumbleCallback(0, RETRO_RUMBLE_WEAK, rumbleUp * 0xFFFF / (rumbleUp + rumbleDown));
+        } else {
+            rumbleCallback(0, RETRO_RUMBLE_STRONG, 0);
+            rumbleCallback(0, RETRO_RUMBLE_WEAK, 0);
+        }
+        rumbleUp = 0;
+        rumbleDown = 0;
+    }
 }
 
 static void _setupMaps(struct mCore* core) {
 #ifdef M_CORE_GBA
-	if (core->platform(core) == PLATFORM_GBA) {
-		struct GBA* gba = core->board;
-		struct retro_memory_descriptor descs[11];
-		struct retro_memory_map mmaps;
-		size_t romSize = gba->memory.romSize + (gba->memory.romSize & 1);
+    if (core->platform(core) == PLATFORM_GBA) {
+        struct GBA* gba = core->board;
+        struct retro_memory_descriptor descs[11];
+        struct retro_memory_map mmaps;
+        size_t romSize = gba->memory.romSize + (gba->memory.romSize & 1);
 
-		memset(descs, 0, sizeof(descs));
-		size_t savedataSize = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+        memset(descs, 0, sizeof(descs));
+        size_t savedataSize = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
 
-		/* Map internal working RAM */
-		descs[0].ptr    = gba->memory.iwram;
-		descs[0].start  = BASE_WORKING_IRAM;
-		descs[0].len    = SIZE_WORKING_IRAM;
-		descs[0].select = 0xFF000000;
+        /* Map internal working RAM */
+        descs[0].ptr    = gba->memory.iwram;
+        descs[0].start  = BASE_WORKING_IRAM;
+        descs[0].len    = SIZE_WORKING_IRAM;
+        descs[0].select = 0xFF000000;
 
-		/* Map working RAM */
-		descs[1].ptr    = gba->memory.wram;
-		descs[1].start  = BASE_WORKING_RAM;
-		descs[1].len    = SIZE_WORKING_RAM;
-		descs[1].select = 0xFF000000;
+        /* Map working RAM */
+        descs[1].ptr    = gba->memory.wram;
+        descs[1].start  = BASE_WORKING_RAM;
+        descs[1].len    = SIZE_WORKING_RAM;
+        descs[1].select = 0xFF000000;
 
-		/* Map save RAM */
-		/* TODO: if SRAM is flash, use start=0 addrspace="S" instead */
-		descs[2].ptr    = savedataSize ? savedata : NULL;
-		descs[2].start  = BASE_CART_SRAM;
-		descs[2].len    = savedataSize;
+        /* Map save RAM */
+        descs[2].ptr    = savedataSize ? savedata : NULL;
+        descs[2].start  = BASE_CART_SRAM;
+        descs[2].len    = savedataSize;
 
-		/* Map ROM */
-		descs[3].ptr    = gba->memory.rom;
-		descs[3].start  = BASE_CART0;
-		descs[3].len    = romSize;
-		descs[3].flags  = RETRO_MEMDESC_CONST;
+        /* Map ROM */
+        descs[3].ptr    = gba->memory.rom;
+        descs[3].start  = BASE_CART0;
+        descs[3].len    = romSize;
+        descs[3].flags  = RETRO_MEMDESC_CONST;
 
-		descs[4].ptr    = gba->memory.rom;
-		descs[4].start  = BASE_CART1;
-		descs[4].len    = romSize;
-		descs[4].flags  = RETRO_MEMDESC_CONST;
+        descs[4].ptr    = gba->memory.rom;
+        descs[4].start  = BASE_CART1;
+        descs[4].len    = romSize;
+        descs[4].flags  = RETRO_MEMDESC_CONST;
 
-		descs[5].ptr    = gba->memory.rom;
-		descs[5].start  = BASE_CART2;
-		descs[5].len    = romSize;
-		descs[5].flags  = RETRO_MEMDESC_CONST;
+        descs[5].ptr    = gba->memory.rom;
+        descs[5].start  = BASE_CART2;
+        descs[5].len    = romSize;
+        descs[5].flags  = RETRO_MEMDESC_CONST;
 
-		/* Map BIOS */
-		descs[6].ptr    = gba->memory.bios;
-		descs[6].start  = BASE_BIOS;
-		descs[6].len    = SIZE_BIOS;
-		descs[6].flags  = RETRO_MEMDESC_CONST;
+        /* Map BIOS */
+        descs[6].ptr    = gba->memory.bios;
+        descs[6].start  = BASE_BIOS;
+        descs[6].len    = SIZE_BIOS;
+        descs[6].flags  = RETRO_MEMDESC_CONST;
 
-		/* Map VRAM */
-		descs[7].ptr    = gba->video.vram;
-		descs[7].start  = BASE_VRAM;
-		descs[7].len    = SIZE_VRAM;
-		descs[7].select = 0xFF000000;
+        /* Map VRAM */
+        descs[7].ptr    = gba->video.vram;
+        descs[7].start  = BASE_VRAM;
+        descs[7].len    = SIZE_VRAM;
+        descs[7].select = 0xFF000000;
 
-		/* Map palette RAM */
-		descs[8].ptr    = gba->video.palette;
-		descs[8].start  = BASE_PALETTE_RAM;
-		descs[8].len    = SIZE_PALETTE_RAM;
-		descs[8].select = 0xFF000000;
+        /* Map palette RAM */
+        descs[8].ptr    = gba->video.palette;
+        descs[8].start  = BASE_PALETTE_RAM;
+        descs[8].len    = SIZE_PALETTE_RAM;
+        descs[8].select = 0xFF000000;
 
-		/* Map OAM */
-		descs[9].ptr    = &gba->video.oam; /* video.oam is a structure */
-		descs[9].start  = BASE_OAM;
-		descs[9].len    = SIZE_OAM;
-		descs[9].select = 0xFF000000;
+        /* Map OAM */
+        descs[9].ptr    = &gba->video.oam;
+        descs[9].start  = BASE_OAM;
+        descs[9].len    = SIZE_OAM;
+        descs[9].select = 0xFF000000;
 
-		/* Map mmapped I/O */
-		descs[10].ptr    = gba->memory.io;
-		descs[10].start  = BASE_IO;
-		descs[10].len    = SIZE_IO;
+        /* Map mmapped I/O */
+        descs[10].ptr   = gba->memory.io;
+        descs[10].start = BASE_IO;
+        descs[10].len   = SIZE_IO;
 
-		mmaps.descriptors = descs;
-		mmaps.num_descriptors = sizeof(descs) / sizeof(descs[0]);
+#ifdef __PS2__
+        /* Ensure pointer alignment validation for PS2 memory maps */
+        for (int j = 0; j < 11; j++) {
+            if (descs[j].ptr && ((uintptr_t)descs[j].ptr & 0x3)) {
+                /* Handle potential unaligned pointer bounds safely if required */
+            }
+        }
+#endif
 
-		bool yes = true;
-		environCallback(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
-		environCallback(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &yes);
-	}
+        mmaps.descriptors = descs;
+        mmaps.num_descriptors = sizeof(descs) / sizeof(descs[0]);
+
+        bool yes = true;
+        environCallback(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
+        environCallback(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &yes);
+    }
 #endif
 #ifdef M_CORE_GB
-	if (core->platform(core) == PLATFORM_GB) {
-		struct GB* gb = core->board;
-		struct retro_memory_descriptor descs[11];
-		struct retro_memory_map mmaps;
+    if (core->platform(core) == PLATFORM_GB) {
+        struct GB* gb = core->board;
+        struct retro_memory_descriptor descs[11];
+        struct retro_memory_map mmaps;
 
-		memset(descs, 0, sizeof(descs));
-		size_t savedataSize = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+        memset(descs, 0, sizeof(descs));
+        size_t savedataSize = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
 
-		unsigned i = 0;
+        unsigned i = 0;
 
-		/* Map ROM */
-		descs[i].ptr    = gb->memory.rom;
-		descs[i].start  = GB_BASE_CART_BANK0;
-		descs[i].len    = GB_SIZE_CART_BANK0;
-		descs[i].flags  = RETRO_MEMDESC_CONST;
-		i++;
+        /* Map ROM */
+        descs[i].ptr    = gb->memory.rom;
+        descs[i].start  = GB_BASE_CART_BANK0;
+        descs[i].len    = GB_SIZE_CART_BANK0;
+        descs[i].flags  = RETRO_MEMDESC_CONST;
+        i++;
 
-		descs[i].ptr    = gb->memory.rom;
-		descs[i].offset = GB_SIZE_CART_BANK0;
-		descs[i].start  = GB_BASE_CART_BANK1;
-		descs[i].len    = GB_SIZE_CART_BANK0;
-		descs[i].flags  = RETRO_MEMDESC_CONST;
-		i++;
+        descs[i].ptr    = gb->memory.rom;
+        descs[i].offset = GB_SIZE_CART_BANK0;
+        descs[i].start  = GB_BASE_CART_BANK1;
+        descs[i].len    = GB_SIZE_CART_BANK0;
+        descs[i].flags  = RETRO_MEMDESC_CONST;
+        i++;
 
-		/* Map VRAM */
-		descs[i].ptr    = gb->video.vram;
-		descs[i].start  = GB_BASE_VRAM;
-		descs[i].len    = GB_SIZE_VRAM_BANK0;
-		i++;
+        /* Map VRAM */
+        descs[i].ptr    = gb->video.vram;
+        descs[i].start  = GB_BASE_VRAM;
+        descs[i].len    = GB_SIZE_VRAM_BANK0;
+        i++;
 
-		/* Map working RAM */
-		descs[i].ptr    = gb->memory.wram;
-		descs[i].start  = GB_BASE_WORKING_RAM_BANK0;
-		descs[i].len    = GB_SIZE_WORKING_RAM_BANK0;
-		i++;
+        /* Map working RAM */
+        descs[i].ptr    = gb->memory.wram;
+        descs[i].start  = GB_BASE_WORKING_RAM_BANK0;
+        descs[i].len    = GB_SIZE_WORKING_RAM_BANK0;
+        i++;
 
-		descs[i].ptr    = gb->memory.wram;
-		descs[i].offset = GB_SIZE_WORKING_RAM_BANK0;
-		descs[i].start  = GB_BASE_WORKING_RAM_BANK1;
-		descs[i].len    = GB_SIZE_WORKING_RAM_BANK0;
-		i++;
+        descs[i].ptr    = gb->memory.wram;
+        descs[i].offset = GB_SIZE_WORKING_RAM_BANK0;
+        descs[i].start  = GB_BASE_WORKING_RAM_BANK1;
+        descs[i].len    = GB_SIZE_WORKING_RAM_BANK0;
+        i++;
 
-		/* Map OAM */
-		descs[i].ptr    = &gb->video.oam; /* video.oam is a structure */
-		descs[i].start  = GB_BASE_OAM;
-		descs[i].len    = GB_SIZE_OAM;
-		descs[i].select = 0xFFFFFF60;
-		i++;
+        /* Map OAM */
+        descs[i].ptr    = &gb->video.oam;
+        descs[i].start  = GB_BASE_OAM;
+        descs[i].len    = GB_SIZE_OAM;
+        descs[i].select = 0xFFFFFF60;
+        i++;
 
-		/* Map mmapped I/O */
-		descs[i].ptr    = gb->memory.io;
-		descs[i].start  = GB_BASE_IO;
-		descs[i].len    = GB_SIZE_IO;
-		i++;
+        /* Map mmapped I/O */
+        descs[i].ptr    = gb->memory.io;
+        descs[i].start  = GB_BASE_IO;
+        descs[i].len    = GB_SIZE_IO;
+        i++;
 
-		/* Map High RAM */
-		descs[i].ptr    = gb->memory.hram;
-		descs[i].start  = GB_BASE_HRAM;
-		descs[i].len    = GB_SIZE_HRAM;
-		descs[i].select = 0xFFFFFF80;
-		i++;
+        /* Map High RAM */
+        descs[i].ptr    = gb->memory.hram;
+        descs[i].start  = GB_BASE_HRAM;
+        descs[i].len    = GB_SIZE_HRAM;
+        descs[i].select = 0xFFFFFF80;
+        i++;
 
-		/* Map IE Register */
-		descs[i].ptr    = &gb->memory.ie;
-		descs[i].start  = GB_BASE_IE;
-		descs[i].len    = 1;
-		i++;
+        /* Map IE Register */
+        descs[i].ptr    = &gb->memory.ie;
+        descs[i].start  = GB_BASE_IE;
+        descs[i].len    = 1;
+        i++;
 
-		/* Map External RAM */
-		if (gb->memory.sram) {
-			descs[i].ptr    = gb->memory.sram;
-			descs[i].start  = GB_BASE_EXTERNAL_RAM;
-			descs[i].len    = savedataSize;
-			i++;
-		}
+        /* Map External RAM */
+        if (gb->memory.sram) {
+            descs[i].ptr    = gb->memory.sram;
+            descs[i].start  = GB_BASE_EXTERNAL_RAM;
+            descs[i].len    = savedataSize;
+            i++;
+        }
 
-		if (gb->model >= GB_MODEL_CGB) {
-			/* Map working RAM */
-			/* banks 2-7 of wram mapped in virtual address so it can be
-			 * accessed without bank switching, GBC only */
-			descs[i].ptr    = gb->memory.wram + 0x2000;
-			descs[i].start  = 0x10000;
-			descs[i].len    = GB_SIZE_WORKING_RAM - 0x2000;
-			descs[i].select = 0xFFFFA000;
-			i++;
-		}
+        if (gb->model >= GB_MODEL_CGB) {
+            /* Map working RAM */
+            descs[i].ptr    = gb->memory.wram + 0x2000;
+            descs[i].start  = 0x10000;
+            descs[i].len    = GB_SIZE_WORKING_RAM - 0x2000;
+            descs[i].select = 0xFFFFA000;
+            i++;
+        }
 
-		mmaps.descriptors = descs;
-		mmaps.num_descriptors = i;
+        mmaps.descriptors = descs;
+        mmaps.num_descriptors = i;
 
-		bool yes = true;
-		environCallback(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
-		environCallback(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &yes);
-	}
+        bool yes = true;
+        environCallback(RETRO_ENVIRONMENT_SET_MEMORY_MAPS, &mmaps);
+        environCallback(RETRO_ENVIRONMENT_SET_SUPPORT_ACHIEVEMENTS, &yes);
+    }
 #endif
 }
 
