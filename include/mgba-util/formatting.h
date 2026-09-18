@@ -14,11 +14,12 @@ CXX_GUARD_START
 
 #ifdef HAVE_XLOCALE
 #include <xlocale.h>
-#elif !defined(HAVE_LOCALE) && !defined(_SYS__LOCALE_H_)
-typedef const char* locale_t;
+#elif !defined(HAVE_LOCALE) && !defined(_SYS__LOCALE_H_) && !defined(__locale_t_defined)
+// PS2 SDK and standard newlib headers already provide locale_t via <sys/_locale.h>
+#ifndef __CYGWIN__
+// Omit custom typedef to prevent conflict with ps2sdk
 #endif
-
-// (Make sure to keep the rest of your file if there's anything below, or replace the top section with this)
+#endif
 
 int ftostr_l(char* restrict str, size_t size, float f, locale_t locale);
 
